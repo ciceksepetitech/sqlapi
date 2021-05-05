@@ -5,6 +5,8 @@ on: [push]
 env:
   NAME: techciceksepeti/sqlapi
   VERSION_PREFIX: 2.0
+  DOCKER_USER: ${{ secrets.DOCKER_USER }}
+  DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
 
 jobs:
   build:
