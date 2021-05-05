@@ -14,7 +14,7 @@ SQL API is designed to be able to run SQL queries on relational databases withou
 Start the docker container named sqlapi by running the following command.
 
 ```bash
-docker run --rm  --name sqlapi -p 8033:8033 ciceksepetitech/sqlapi
+docker run --rm  --name sqlapi -p 8033:8033 techciceksepeti/sqlapi
 ```
 
 **Example request:**
