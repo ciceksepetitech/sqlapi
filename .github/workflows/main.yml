@@ -1,0 +1,26 @@
+name: Main
+
+on: [push]
+
+env:
+  NAME: techciceksepeti/sqlapi
+  VERSION_PREFIX: 2.0
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Build
+        run: |
+          docker build --rm=false -t $NAME .
+          docker tag $NAME $NAME:latest
+          docker tag $NAME $NAME:$VERSION_PREFIX.$GITHUB_RUN_NUMBER
+
+      - name: Push
+        run: |
+          docker login -u $DOCKER_USER -p $DOCKER_PASS
+          docker push $NAME:latest
+          docker push $NAME:$VERSION_PREFIX.$GITHUB_RUN_NUMBER
