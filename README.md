@@ -1,6 +1,6 @@
 # SQL API
 
-SQL API is designed to be able to run SQL queries on relational databases without any configuration by simple HTTP call. The request contains the DB credentials and the SQL query as well.
+SQL API is designed to be able to run queries on databases without any configuration by simple HTTP call. The request contains the DB credentials and the query as well.
 
 **Warning!** Do not use it in production. SQL API is suitable for test environments. In particular for `integration tests`.
 
