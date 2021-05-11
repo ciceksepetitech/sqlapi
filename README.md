@@ -8,6 +8,7 @@ SQL API is designed to be able to run SQL queries on relational databases withou
 
 - MySQL
 - MSSQL
+- MongoDB
 
 ## Usage
 
@@ -47,6 +48,23 @@ The response represents the rows returned from the database.
   }
 ]
 ```
+
+**Example request for mongodb:**
+
+```bash
+curl -X POST  http://localhost:8033/sql \
+  -d '{
+        "db": {
+            "type": "mongodb",
+            "host": "localhost:27017",
+            "name": "DBName",
+            "user": "mongoadmin",
+            "password": "secret"
+        },
+        "collection": "CollectionName",
+        "query": "{\"_id\":\"609a80caa23379b236426ad2\"}"
+    }'
+````
 
 ## License
 

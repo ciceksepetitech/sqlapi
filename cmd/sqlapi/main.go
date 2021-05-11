@@ -1,13 +1,19 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"time"
 
+	"github.com/ciceksepetitech/sqlapi/internal/mongodb"
 	"github.com/ciceksepetitech/sqlapi/internal/mssql"
 	"github.com/ciceksepetitech/sqlapi/internal/mysql"
 )
@@ -47,12 +53,49 @@ func query(w http.ResponseWriter, r *http.Request) {
 		defer rows.Close()
 		result = mapToInterface(rows)
 		break
+	case "mongodb":
+		var filter map[string]interface{}
+		if err := json.Unmarshal([]byte(p.Query), &filter); err != nil {
+			panic(err)
+		}
+		if v, ok := filter["_id"]; ok {
+			id, err := primitive.ObjectIDFromHex(v.(string))
+			if err != nil {
+				panic(err)
+			}
+			filter["_id"] = id
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		client := mongodb.I(p.DB.User, p.DB.Password, p.DB.Host)
+		cur, err := client.Database(p.DB.Name).Collection(p.Collection).Find(ctx, filter)
+		if err != nil {
+			panic(err)
+		}
+		defer cur.Close(ctx)
+		result = mapToInterfaceMongo(ctx, cur)
+		break
 	default:
 		panic("The db type you specified does not implemented.")
 	}
 
 	encoder := json.NewEncoder(w)
 	encoder.Encode(result)
+}
+
+func mapToInterfaceMongo(ctx context.Context, cur *mongo.Cursor) (result []map[string]interface{}) {
+	for cur.Next(ctx) {
+		var r bson.M
+		err := cur.Decode(&r)
+		if err != nil {
+			panic(err)
+		}
+		result = append(result, r)
+	}
+	if err := cur.Err(); err != nil {
+		panic(err)
+	}
+	return result
 }
 
 func mapToInterface(rows *sql.Rows) []map[string]interface{} {
@@ -92,8 +135,9 @@ func mapToInterface(rows *sql.Rows) []map[string]interface{} {
 
 // SQLRequest .
 type SQLRequest struct {
-	Query string `json:"query"`
-	DB    *DB    `json:"db"`
+	Query      string `json:"query"`
+	Collection string `json:"collection"`
+	DB         *DB    `json:"db"`
 }
 
 // DB .
