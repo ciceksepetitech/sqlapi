@@ -59,12 +59,16 @@ func query(w http.ResponseWriter, r *http.Request) {
 			panic(err)
 		}
 		if v, ok := filter["_id"]; ok {
-			id, err := primitive.ObjectIDFromHex(v.(string))
-			if err != nil {
-				panic(err)
-			}
-			filter["_id"] = id
-		}
+            if primitive.IsValidObjectID(v.(string)){
+                id, err := primitive.ObjectIDFromHex(v.(string))
+                if err != nil {
+                    panic(err)
+                }
+                filter["_id"] = id  
+            } else{
+                filter["_id"] = v.(string)  
+            }
+        }
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		client := mongodb.I(p.DB.User, p.DB.Password, p.DB.Host)
