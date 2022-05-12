@@ -5,13 +5,14 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 
 	"github.com/ciceksepetitech/sqlapi/internal/mongodb"
 	"github.com/ciceksepetitech/sqlapi/internal/mssql"
@@ -59,11 +60,15 @@ func query(w http.ResponseWriter, r *http.Request) {
 			panic(err)
 		}
 		if v, ok := filter["_id"]; ok {
-			id, err := primitive.ObjectIDFromHex(v.(string))
-			if err != nil {
-				panic(err)
+			if primitive.IsValidObjectID(v.(string)) {
+				id, err := primitive.ObjectIDFromHex(v.(string))
+				if err != nil {
+					panic(err)
+				}
+				filter["_id"] = id
+			} else {
+				filter["_id"] = v.(string)
 			}
-			filter["_id"] = id
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
