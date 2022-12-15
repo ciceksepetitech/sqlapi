@@ -5,9 +5,11 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -70,10 +72,28 @@ func query(w http.ResponseWriter, r *http.Request) {
 				filter["_id"] = v.(string)
 			}
 		}
+		opts := options.Find()
+		if v, ok := filter["$sort"]; ok {
+			s := bson.D{}
+			for k, vv := range v.(map[string]interface{}) {
+				s = append(s, bson.E{Key: k, Value: vv})
+
+			}
+			opts.SetSort(s)
+			delete(filter, "$sort")
+		}
+		for k, v := range filter {
+			if obj, ok := v.(map[string]interface{}); ok {
+				if rgx, okk := obj["$regex"]; okk {
+					items := strings.Split(rgx.(string), "/")
+					filter[k] = bson.D{{"$regex", primitive.Regex{Pattern: items[1], Options: items[2]}}}
+				}
+			}
+		}
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		client := mongodb.I(p.DB.User, p.DB.Password, p.DB.Host)
-		cur, err := client.Database(p.DB.Name).Collection(p.Collection).Find(ctx, filter)
+		cur, err := client.Database(p.DB.Name).Collection(p.Collection).Find(ctx, filter, opts)
 		if err != nil {
 			panic(err)
 		}
