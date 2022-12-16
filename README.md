@@ -62,7 +62,7 @@ curl -X POST  http://localhost:8033/sql \
             "password": "secret"
         },
         "collection": "CollectionName",
-        "query": "{\"_id\":\"609a80caa23379b236426ad2\"}"
+        "query": "{\"_id\":\"609a80caa23379b236426ad2\", \"$sort\": { \"name\": -1 }, \"name.first\": { \"$regex\": \"/John/i\" }}"
     }'
 ````
 

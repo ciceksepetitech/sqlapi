@@ -56,7 +56,7 @@ func I(user string, password string, host string) *mongo.Client {
 		panic(err)
 	}
 
-	if err := client.Ping(ctx, readpref.Primary()); err != nil {
+	if err = client.Ping(ctx, readpref.Primary()); err != nil {
 		panic(err)
 	}
 
