@@ -1,28 +1,37 @@
-name: Main
+name: Build and Push sqlapi
 
-on: [push]
-
-env:
-  NAME: techciceksepeti/sqlapi
-  VERSION_PREFIX: 2.0
-  DOCKER_USER: ${{ secrets.DOCKER_USER }}
-  DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
+on:
+  push
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+    env:
+      SQLAPI: techciceksepeti/sqlapi
+      TAG_SQLAPI: 2.8-multi-platform
+
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
-      - name: Build
+      - name: Set environment variables
+        env:
+          SECRETS_CONTEXT: ${{ toJson(secrets) }}
         run: |
-          docker build --rm=false -t $NAME .
-          docker tag $NAME $NAME:latest
-          docker tag $NAME $NAME:$VERSION_PREFIX.$GITHUB_RUN_NUMBER
+          echo "$SECRETS_CONTEXT" | jq -r 'to_entries[] | "\(.key)=\(.value)"' >> $GITHUB_ENV
 
-      - name: Push
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker-container
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USER  }}
+          password: ${{ secrets.DOCKER_PASS  }}
+
+      - name: Build and Push sqlapi Docker Image
         run: |
-          docker login -u $DOCKER_USER -p $DOCKER_PASS
-          docker push $NAME:latest
-          docker push $NAME:$VERSION_PREFIX.$GITHUB_RUN_NUMBER
+          bash ./build-image-multi-platform.sh $SQLAPI Dockerfile $TAG_SQLAPI
