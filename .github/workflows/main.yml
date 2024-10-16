@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SQLAPI: techciceksepeti/sqlapi
-      TAG_SQLAPI: 2.8-multi-platform
+      TAG_SQLAPI: latest
 
     steps:
       - uses: actions/checkout@v4
