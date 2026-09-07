@@ -57,48 +57,7 @@ func query(w http.ResponseWriter, r *http.Request) {
 		result = mapToInterface(rows)
 		break
 	case "mongodb":
-		var filter map[string]interface{}
-		if err := json.Unmarshal([]byte(p.Query), &filter); err != nil {
-			panic(err)
-		}
-		if v, ok := filter["_id"]; ok {
-			if primitive.IsValidObjectID(v.(string)) {
-				id, err := primitive.ObjectIDFromHex(v.(string))
-				if err != nil {
-					panic(err)
-				}
-				filter["_id"] = id
-			} else {
-				filter["_id"] = v.(string)
-			}
-		}
-		opts := options.Find()
-		if v, ok := filter["$sort"]; ok {
-			s := bson.D{}
-			for k, vv := range v.(map[string]interface{}) {
-				s = append(s, bson.E{Key: k, Value: vv})
-
-			}
-			opts.SetSort(s)
-			delete(filter, "$sort")
-		}
-		for k, v := range filter {
-			if obj, ok := v.(map[string]interface{}); ok {
-				if rgx, okk := obj["$regex"]; okk {
-					items := strings.Split(rgx.(string), "/")
-					filter[k] = bson.D{{"$regex", primitive.Regex{Pattern: items[1], Options: items[2]}}}
-				}
-			}
-		}
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		client := mongodb.I(p.DB.User, p.DB.Password, p.DB.Host)
-		cur, err := client.Database(p.DB.Name).Collection(p.Collection).Find(ctx, filter, opts)
-		if err != nil {
-			panic(err)
-		}
-		defer cur.Close(ctx)
-		result = mapToInterfaceMongo(ctx, cur)
+		result = handleMongoDB(p)
 		break
 	default:
 		panic("The db type you specified does not implemented.")
@@ -106,6 +65,117 @@ func query(w http.ResponseWriter, r *http.Request) {
 
 	encoder := json.NewEncoder(w)
 	encoder.Encode(result)
+}
+
+func handleMongoDB(p *SQLRequest) []map[string]interface{} {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	client := mongodb.I(p.DB.User, p.DB.Password, p.DB.Host)
+	coll := client.Database(p.DB.Name).Collection(p.Collection)
+
+	operation := p.Operation
+	if operation == "" {
+		operation = "find"
+	}
+
+	switch operation {
+	case "find":
+		return mongoFind(ctx, coll, p.Query)
+	case "updateOne":
+		return mongoUpdate(ctx, coll, p.Query, false)
+	case "updateMany":
+		return mongoUpdate(ctx, coll, p.Query, true)
+	default:
+		panic("unsupported mongodb operation: " + operation)
+	}
+}
+
+func mongoFind(ctx context.Context, coll *mongo.Collection, query string) []map[string]interface{} {
+	var filter map[string]interface{}
+	if err := json.Unmarshal([]byte(query), &filter); err != nil {
+		panic(err)
+	}
+
+	opts := options.Find()
+	if v, ok := filter["$sort"]; ok {
+		s := bson.D{}
+		for k, vv := range v.(map[string]interface{}) {
+			s = append(s, bson.E{Key: k, Value: vv})
+		}
+		opts.SetSort(s)
+		delete(filter, "$sort")
+	}
+
+	prepareMongoFilter(filter)
+
+	cur, err := coll.Find(ctx, filter, opts)
+	if err != nil {
+		panic(err)
+	}
+	defer cur.Close(ctx)
+
+	return mapToInterfaceMongo(ctx, cur)
+}
+
+type mongoUpdateQuery struct {
+	Filter map[string]interface{} `json:"filter"`
+	Update map[string]interface{} `json:"update"`
+	Upsert bool                   `json:"upsert"`
+}
+
+func mongoUpdate(ctx context.Context, coll *mongo.Collection, query string, many bool) []map[string]interface{} {
+	var mq mongoUpdateQuery
+	if err := json.Unmarshal([]byte(query), &mq); err != nil {
+		panic(err)
+	}
+
+	prepareMongoFilter(mq.Filter)
+
+	opts := options.Update()
+	if mq.Upsert {
+		opts.SetUpsert(true)
+	}
+
+	var res *mongo.UpdateResult
+	var err error
+	if many {
+		res, err = coll.UpdateMany(ctx, mq.Filter, mq.Update, opts)
+	} else {
+		res, err = coll.UpdateOne(ctx, mq.Filter, mq.Update, opts)
+	}
+	if err != nil {
+		panic(err)
+	}
+
+	return []map[string]interface{}{{
+		"matchedCount":  res.MatchedCount,
+		"modifiedCount": res.ModifiedCount,
+		"upsertedCount": res.UpsertedCount,
+	}}
+}
+
+func prepareMongoFilter(filter map[string]interface{}) {
+	if v, ok := filter["_id"]; ok {
+		if primitive.IsValidObjectID(v.(string)) {
+			id, err := primitive.ObjectIDFromHex(v.(string))
+			if err != nil {
+				panic(err)
+			}
+			filter["_id"] = id
+		} else {
+			filter["_id"] = v.(string)
+		}
+	}
+
+	for k, v := range filter {
+		if obj, ok := v.(map[string]interface{}); ok {
+			if rgx, okk := obj["$regex"]; okk {
+				items := strings.Split(rgx.(string), "/")
+				filter[k] = bson.D{{"$regex", primitive.Regex{Pattern: items[1], Options: items[2]}}}
+			}
+		}
+	}
 }
 
 func mapToInterfaceMongo(ctx context.Context, cur *mongo.Cursor) (result []map[string]interface{}) {
@@ -162,6 +232,7 @@ func mapToInterface(rows *sql.Rows) []map[string]interface{} {
 type SQLRequest struct {
 	Query      string `json:"query"`
 	Collection string `json:"collection"`
+	Operation  string `json:"operation"`
 	DB         *DB    `json:"db"`
 }
 

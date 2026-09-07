@@ -49,7 +49,7 @@ The response represents the rows returned from the database.
 ]
 ```
 
-**Example request for mongodb:**
+**Example request for mongodb (find):**
 
 ```bash
 curl -X POST  http://localhost:8033/sql \
@@ -62,9 +62,42 @@ curl -X POST  http://localhost:8033/sql \
             "password": "secret"
         },
         "collection": "CollectionName",
+        "operation": "find",
         "query": "{\"_id\":\"609a80caa23379b236426ad2\", \"$sort\": { \"name\": -1 }, \"name.first\": { \"$regex\": \"/John/i\" }}"
     }'
-````
+```
+
+**Example request for mongodb (update):**
+
+Supported operations: `find` (default), `updateOne`, `updateMany`.
+
+```bash
+curl -X POST  http://localhost:8033/sql \
+  -d '{
+        "db": {
+            "type": "mongodb",
+            "host": "localhost:27017",
+            "name": "DBName",
+            "user": "mongoadmin",
+            "password": "secret"
+        },
+        "collection": "CollectionName",
+        "operation": "updateOne",
+        "query": "{\"filter\": {\"_id\": \"609a80caa23379b236426ad2\"}, \"update\": {\"$set\": {\"status\": \"active\"}}}"
+    }'
+```
+
+**Example update response:**
+
+```json
+[
+  {
+    "matchedCount": 1,
+    "modifiedCount": 1,
+    "upsertedCount": 0
+  }
+]
+```
 
 ## License
 
